@@ -97,16 +97,13 @@ func (d *Decoder) Decode(v interface{}) error {
 		return err
 	}
 
-	// <?xml version="1.0" encoding="UTF-8"?>
+	// <?xml ...?>
 	pi, ok := t.(xml.ProcInst)
 	if !ok {
 		return errors.New("plist: expected ProcInst as first element")
 	}
 	if pi.Target != "xml" {
 		return errors.New("plist: expected xml ProcInst")
-	}
-	if string(pi.Inst) != `version="1.0" encoding="UTF-8"` {
-		return errors.New("plist: unexpected xml ProcInst")
 	}
 
 	// \n
@@ -115,7 +112,7 @@ func (d *Decoder) Decode(v interface{}) error {
 		return err
 	}
 
-	// <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+	// doctype
 	t, err = d.xd.Token()
 	if err != nil {
 		return err
@@ -124,7 +121,7 @@ func (d *Decoder) Decode(v interface{}) error {
 	if !ok {
 		return errors.New("plist: expected directive")
 	}
-	if string(directive) != `DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"` {
+	if string(directive) != xmlPlistDocType {
 		return errors.New("plist: expected plist DTD")
 	}
 
@@ -160,7 +157,7 @@ func (d *Decoder) parsePlist(v interface{}) error {
 		return err
 	}
 
-	// <plist version="1.0">
+	// <plist version="xxxx">
 	se, ok := t.(xml.StartElement)
 	if !ok {
 		return errors.New("plist: expected StartElement")
@@ -171,7 +168,7 @@ func (d *Decoder) parsePlist(v interface{}) error {
 	if len(se.Attr) != 1 {
 		return errors.New("plist: unexpected amount of attrs to plist StartElement")
 	}
-	if se.Attr[0].Name.Local != "version" && se.Attr[0].Value != "1.0" {
+	if se.Attr[0].Name.Local != "version" && se.Attr[0].Value != xmlPlistVersion {
 		return errors.New("plist: unexpected plist version")
 	}
 
