@@ -3,6 +3,7 @@ package xmlplist
 import (
 	"io/ioutil"
 	"testing"
+	"time"
 )
 
 func TestUnmarshalEntitlements(t *testing.T) {
@@ -207,5 +208,28 @@ func TestUnmarshalArrayRootElement(t *testing.T) {
 		if array[i].(string) != s {
 			t.Fatalf("bad value at idx=%v", i)
 		}
+	}
+}
+
+func TestUnmarshalDate(t *testing.T) {
+	buf, err := ioutil.ReadFile("testdata/Date.plist")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var m map[string]interface{}
+	err = Unmarshal(buf, &m)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	expectedT, err := time.Parse(time.RFC3339, "2012-01-29T13:07:25Z")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	readT, ok := m["now"].(time.Time)
+	if !ok {
+		t.Fatalf("no date in map")
+	}
+	if !readT.UTC().Equal(expectedT.UTC()) {
+		t.Fatalf("date mismatch")
 	}
 }

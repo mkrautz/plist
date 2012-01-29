@@ -10,6 +10,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"time"
 )
 
 // Unmarshal parses the XML-plist data and stores the result
@@ -310,7 +311,12 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 			}
 			dictMap[keyName] = b
 		case "date":
-			return errors.New("plist: no date support")
+			var t time.Time
+			err = d.readDate(&t, se)
+			if err != nil {
+				return err
+			}
+			dictMap[keyName] = t
 		case "data":
 			var buf []byte
 			err = d.readData(&buf, se)
@@ -431,7 +437,12 @@ func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 			}
 			slice = append(slice, b)
 		case "date":
-			return errors.New("plist: no date support")
+			var t time.Time
+			err = d.readDate(&t, se)
+			if err != nil {
+				return err
+			}
+			slice = append(slice, t)
 		case "data":
 			var buf []byte
 			err = d.readData(&buf, se)
@@ -495,7 +506,29 @@ func (d *Decoder) readBool(v interface{}, se xml.StartElement) error {
 
 // readDate reads an XML plist date into the value v.
 func (d *Decoder) readDate(v interface{}, se xml.StartElement) error {
-	return errors.New("plist: date support not yet implemented")
+	if reflect.TypeOf(v).Kind() != reflect.Ptr {
+		return errors.New("plist: v must be ptr")
+	}
+
+	buf, err := d.expectCharData()
+	if err != nil {
+		return err
+	}
+
+	t, err := time.Parse(time.RFC3339, string(buf))
+	if err != nil {
+		return err
+	}
+
+	rv := reflect.ValueOf(v).Elem()
+	rv.Set(reflect.ValueOf(t))
+
+	err = d.readEndElement("date")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // readData reads an XML plist data blob into the value v.
