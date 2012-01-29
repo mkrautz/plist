@@ -195,7 +195,7 @@ func (d *Decoder) parsePlist(v interface{}) error {
 		return errors.New("plist: expected StartElement (or EndElement)")
 	}
 
-	err = d.readType(v, se)
+	err = d.readRootType(v, se)
 	if err != nil {
 		return err
 	}
@@ -204,9 +204,9 @@ func (d *Decoder) parsePlist(v interface{}) error {
 }
 
 
-// readType reads a root element into v. The type of the root element
+// readRootType reads a root element into v. The type of the root element
 // is deducted from the start element passed as se.
-func (d *Decoder) readType(v interface{}, se xml.StartElement) error {
+func (d *Decoder) readRootType(v interface{}, se xml.StartElement) error {
 	switch se.Name.Local {
 	case "dict":
 		return d.readDict(v, se)
