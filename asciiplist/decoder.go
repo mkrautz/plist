@@ -153,7 +153,7 @@ Loop:
 		case tokenString:
 			m[keyName] = string(tok.(tokenString))
 		case tokenData:
-			m[keyName] = []byte(tok.(tokenString))
+			m[keyName] = []byte(tok.(tokenData))
 		default:
 			return errors.New("plist: bad dict value element token")
 		}
