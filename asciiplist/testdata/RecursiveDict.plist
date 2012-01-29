@@ -1,0 +1,9 @@
+{
+	name = SuperDict;
+	dict = {
+		hey = 1;
+		you = 2;
+		what = 3;
+		up = 4;
+	};
+}
