@@ -59,6 +59,29 @@ func TestUnmarshalEntitlementsWeirdWhitespaceToStruct(t *testing.T) {
 	}
 }
 
+type RecursiveEntitlements struct {
+	GetTaskAllow bool         `plist:"get-task-allow"`
+	Entitlements Entitlements `plist:"Entitlements"`
+}
+
+func TestUnmarshalRecursiveEntitlements(t *testing.T) {
+	buf, err := ioutil.ReadFile("testdata/RecursiveEntitlements.plist")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var r RecursiveEntitlements
+	err = Unmarshal(buf, &r)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if r.GetTaskAllow != true {
+		t.Fatalf("get-task-allow is false")
+	}
+	if r.Entitlements.GetTaskAllow != true {
+		t.Fatalf("not recursive")
+	}
+}
+
 func TestUnmarshalBooleanRootElement(t *testing.T) {
 	buf, err := ioutil.ReadFile("testdata/BoolRoot.plist")
 	if err != nil {

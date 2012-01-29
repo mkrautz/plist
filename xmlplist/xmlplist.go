@@ -346,23 +346,42 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
-	if rv.Kind() == reflect.Map {
-		rv.Set(reflect.ValueOf(dictMap))
-	} else if rv.Kind() == reflect.Struct {
-		rt := rv.Type()
-		nfields := rv.NumField()
-		for i := 0; i < nfields; i++ {
-			f := rt.Field(i)
-			name := f.Tag.Get("plist")
+	err := mapToValue(dictMap, rv)
+	if err != nil {
+		return err
+	}
 
+	return nil
+}
+
+// mapToStruct converts the map-representation of the dictionary in dict
+// into a struct or a map given as val. Recursive structs and maps are
+// supported.
+func mapToValue(dict map[string]interface{}, val reflect.Value) error {
+	if val.Kind() == reflect.Map {
+		val.Set(reflect.ValueOf(dict))
+	} else if val.Kind() == reflect.Struct {
+		typ := val.Type()
+		nfields := val.NumField()
+		for i := 0; i < nfields; i++ {
+			f := typ.Field(i)
+			name := f.Tag.Get("plist")
 			if name != "" {
-				if val, ok := dictMap[name]; ok {
-					rv.Field(i).Set(reflect.ValueOf(val))
+				if dictVal, ok := dict[name]; ok {
+					fieldVal := val.Field(i)
+					if fieldVal.Kind() == reflect.Map || fieldVal.Kind() == reflect.Struct {
+						newDict, ok := dictVal.(map[string]interface{})
+						if !ok {
+							return errors.New("plist: attempt to unmarshal non-map into map or struct")
+						}
+						mapToValue(newDict, fieldVal)
+					} else {
+						fieldVal.Set(reflect.ValueOf(dictVal))
+					}
 				}
 			}
 		}
 	}
-
 	return nil
 }
 
