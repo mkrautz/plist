@@ -44,6 +44,35 @@ func TestDetectingReaderXML(t *testing.T) {
 	}
 }
 
+func TestDetectingReaderASCII(t *testing.T) {
+	var val []interface{}
+
+	buf, err := ioutil.ReadFile("asciiplist/testdata/Array.plist")
+	if err != nil {
+		t.Fatalf("unable to read array plist: %v", err)
+	}
+
+	err = Unmarshal(buf, &val)
+	if err != nil {
+		t.Fatalf("unable to unmarshal: %v", err)
+	}
+
+	expected := []string{"hey", "what", "up"}
+	if len(expected) != len(val) {
+		t.Fatalf("unexpected read from ascii plist decoder")
+	}
+
+	for i, str := range expected {
+		valStr, ok := val[i].(string)
+		if !ok {
+			t.Fatalf("non-string in returned array")
+		}
+		if valStr != str {
+			t.Fatalf("ascii plist mismatch")
+		}
+	}
+}
+
 func TestDetectingReaderBinary(t *testing.T) {
 	var e Entitlements
 

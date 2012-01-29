@@ -4,6 +4,7 @@ package plist
 import (
 	"bytes"
 	"errors"
+	"github.com/mkrautz/plist/asciiplist"
 	"github.com/mkrautz/plist/xmlplist"
 	"io"
 	"strings"
@@ -69,7 +70,7 @@ func (r *detectingReader) detectKind() (Kind, error) {
 		return XML, nil
 	} else if strings.Contains(str, "bplist") {
 		return Binary, nil
-	} else if strings.Contains(str, "{(") {
+	} else if strings.ContainsAny(str, "{(") {
 		return ASCII, nil
 	}
 
@@ -114,6 +115,8 @@ func (d *Decoder) Decode(v interface{}) error {
 		}
 		if kind == XML {
 			d.plistDec = xmlplist.NewDecoder(d.dr)
+		} else if kind == ASCII {
+			d.plistDec = asciiplist.NewDecoder(d.dr)
 		} else {
 			return errors.New("plist: unknown kind")
 		}
