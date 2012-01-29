@@ -82,6 +82,38 @@ func TestUnmarshalRecursiveEntitlements(t *testing.T) {
 	}
 }
 
+func TestUnmarshalRecursiveEntitlementsMap(t *testing.T) {
+	buf, err := ioutil.ReadFile("testdata/RecursiveEntitlements.plist")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var m map[string]interface{}
+	err = Unmarshal(buf, &m)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	b, ok := m["get-task-allow"].(bool)
+	if !ok {
+		t.Fatalf("get-task-allow is not bool")
+	}
+	if b != true {
+		t.Fatalf("get-task-allow not true")
+	}
+
+	sm, ok := m["Entitlements"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("unable to get submap")
+	}
+	b, ok = sm["get-task-allow"].(bool)
+	if !ok {
+		t.Fatalf("unable to get get-task-allow from submap as bool")
+	}
+	if b != true {
+		t.Fatalf("get-task-allow from submap is not true")
+	}
+}
+
 func TestUnmarshalBooleanRootElement(t *testing.T) {
 	buf, err := ioutil.ReadFile("testdata/BoolRoot.plist")
 	if err != nil {
