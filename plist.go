@@ -69,6 +69,8 @@ func (r *detectingReader) detectKind() (Kind, error) {
 		return XML, nil
 	} else if strings.Contains(str, "bplist") {
 		return Binary, nil
+	} else if strings.Contains(str, "{(") {
+		return ASCII, nil
 	}
 
 	return Unknown, errors.New("plist: unknown kind")
