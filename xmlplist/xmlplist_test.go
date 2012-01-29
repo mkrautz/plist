@@ -44,6 +44,20 @@ func TestUnmarshalEntitlementsToStruct(t *testing.T) {
 	}
 }
 
+func TestUnmarshalEntitlementsWeirdWhitespaceToStruct(t *testing.T) {
+	buf, err := ioutil.ReadFile("testdata/EntitlementsWeirdWhitespace.plist")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var e Entitlements
+	err = Unmarshal(buf, &e)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if e.GetTaskAllow != true {
+		t.Fatalf("get-task-allow is false")
+	}
+}
 
 func TestUnmarshalBooleanRootElement(t *testing.T) {
 	buf, err := ioutil.ReadFile("testdata/BoolRoot.plist")

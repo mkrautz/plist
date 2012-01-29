@@ -32,6 +32,64 @@ func NewDecoder(r io.Reader) *Decoder {
 	return d
 }
 
+// nextElement returns the next StartElement or EndElement
+// token found in the stream.
+func (d *Decoder) nextElement() (xml.Token, error) {
+	for {
+		t, err := d.xd.Token()
+		if err != nil {
+			return nil, err
+		}
+
+		switch t.(type) {
+		case xml.StartElement, xml.EndElement:
+			return t, nil
+		}
+	}
+	return nil, nil
+}
+
+// readEndElement reads the end element with the specified name.
+// If a non-EndElement is encountered, or a wrong name is encountered
+// an error is returned.
+func (d *Decoder) readEndElement(name string) error {
+	t, err := d.nextElement()
+	if err != nil {
+		return err
+	}
+	ee, ok := t.(xml.EndElement)
+	if !ok {
+		return err
+	}
+	if ee.Name.Local != name {
+		return fmt.Errorf("plist: expected end element %q", name)
+	}
+	return nil
+}
+
+// expectWhitespace reads the next element (expected to be a
+// charadata token), and checks whether it only contains whitespace.
+// If not, it returns an error.
+func (d *Decoder) expectWhitespace() error {
+	t, err := d.xd.Token()
+	if err != nil {
+		return err
+	}
+	cd, ok := t.(xml.CharData)
+	if !ok {
+		return errors.New("plist: expected newline")
+	}
+	for _, r := range cd {
+		switch r {
+			case '\n', '\t', ' ':
+				// ok
+			default:
+				return fmt.Errorf("plist: unexpected character in whitespace: %q", r)
+		}
+	}
+	return nil
+}
+
 // Decode decodes a single XML plist from the decoder.
 func (d *Decoder) Decode(v interface{}) error {
 	t, err := d.xd.Token()
@@ -79,28 +137,9 @@ func (d *Decoder) Decode(v interface{}) error {
 	return d.parsePlist(v)
 }
 
-func (d *Decoder) expectWhitespace() error {
-	t, err := d.xd.Token()
-	if err != nil {
-		return err
-	}
-	cd, ok := t.(xml.CharData)
-	if !ok {
-		return errors.New("plist: expected newline")
-	}
-	for _, r := range cd {
-		switch r {
-			case '\n':
-			case '\t':
-			case ' ':
-				// ok
-			default:
-				return fmt.Errorf("plist: unexpected character in whitespace: %q", r)
-		}
-	}
-	return nil
-}
-
+// expectCharData reads the next token of the stream,
+// expecting it to be a CharData token. If it isn't
+// an error is returned.
 func (d *Decoder) expectCharData() ([]byte, error) {
 	t, err := d.xd.Token()
 	if err != nil {
@@ -113,8 +152,10 @@ func (d *Decoder) expectCharData() ([]byte, error) {
 	return []byte(cd), nil
 }
 
+// parsePlist parses the first <plist> StartElement and
+// begins reading the root element of the plist into v.
 func (d *Decoder) parsePlist(v interface{}) error {
-	t, err := d.xd.Token()
+	t, err := d.nextElement()
 	if err != nil {
 		return err
 	}
@@ -134,14 +175,8 @@ func (d *Decoder) parsePlist(v interface{}) error {
 		return errors.New("plist: unexpected plist version")
 	}
 
-	// \n
-	err = d.expectWhitespace()
-	if err != nil {
-		return err
-	}
-
 	// Read the root element of the plist
-	t, err = d.xd.Token()
+	t, err = d.nextElement()
 	if err != nil {
 		return err
 	}
@@ -168,6 +203,9 @@ func (d *Decoder) parsePlist(v interface{}) error {
 	return nil
 }
 
+
+// readType reads a root element into v. The type of the root element
+// is deducted from the start element passed as se.
 func (d *Decoder) readType(v interface{}, se xml.StartElement) error {
 	switch se.Name.Local {
 	case "dict":
@@ -191,6 +229,11 @@ func (d *Decoder) readType(v interface{}, se xml.StartElement) error {
 	return nil
 }
 
+// readDict parses an XML plist dictionary. The StartElement given
+// must be a dict StartElement. readDict fills out the the value v
+// with the contents of the dict. readDict ends reading the dictionary
+// once it encounters an end element with the same name as was given in
+// se.
 func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -198,13 +241,8 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 
 	dictMap := map[string]interface{}{}
 	for {
-		err := d.expectWhitespace()
-		if err != nil {
-			return err
-		}
-	
 		// read <key>
-		t, err := d.xd.Token()
+		t, err := d.nextElement()
 		if err != nil {
 			return err
 		}
@@ -230,7 +268,7 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 		keyName := string(keyNameBuf)
 
 		// read </key>
-		t, err = d.xd.Token()
+		t, err = d.nextElement()
 		if err != nil {
 			return err
 		}
@@ -242,13 +280,8 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 			return errors.New("plist: expected end element for key")
 		}
 
-		err = d.expectWhitespace()
-		if err != nil {
-			return err
-		}
-
 		// read type
-		t, err = d.xd.Token()
+		t, err = d.nextElement()
 		if err != nil {
 			return err
 		}
@@ -333,6 +366,9 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 	return nil
 }
 
+// readArray reads an XML plist array into v. The se parameter must be
+// a StartElement with name array. readArray stops reading when an
+// EndElement with name array is encountered.
 func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -340,12 +376,7 @@ func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 
 	var slice []interface{}
 	for {
-		err := d.expectWhitespace()
-		if err != nil {
-			return err
-		}
-
-		t, err := d.xd.Token()
+		t, err := d.nextElement()
 		if err != nil {
 			return err
 		}
@@ -421,6 +452,7 @@ func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 	return nil
 }
 
+// readBool reads an XML plist boolean into the value v.
 func (d *Decoder) readBool(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -445,10 +477,12 @@ func (d *Decoder) readBool(v interface{}, se xml.StartElement) error {
 	return nil	
 }
 
+// readDate reads an XML plist date into the value v.
 func (d *Decoder) readDate(v interface{}, se xml.StartElement) error {
 	return errors.New("plist: date support not yet implemented")
 }
 
+// readData reads an XML plist data blob into the value v.
 func (d *Decoder) readData(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -475,6 +509,7 @@ func (d *Decoder) readData(v interface{}, se xml.StartElement) error {
 	return nil
 }
 
+// readString reads an XML plist string into the value v.
 func (d *Decoder) readString(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -496,6 +531,7 @@ func (d *Decoder) readString(v interface{}, se xml.StartElement) error {
 	return nil
 }
 
+// readReal reads an XML plist real number into the value v.
 func (d *Decoder) readReal(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -530,6 +566,7 @@ func (d *Decoder) readReal(v interface{}, se xml.StartElement) error {
 	return nil
 }
 
+// readInteger reads an XML plist integer into the value v.
 func (d *Decoder) readInteger(v interface{}, se xml.StartElement) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
 		return errors.New("plist: v must be ptr")
@@ -570,20 +607,5 @@ func (d *Decoder) readInteger(v interface{}, se xml.StartElement) error {
 		return err
 	}
 
-	return nil
-}
-
-func (d *Decoder) readEndElement(name string) error {
-	t, err := d.xd.Token()
-	if err != nil {
-		return err
-	}
-	ee, ok := t.(xml.EndElement)
-	if !ok {
-		return err
-	}
-	if ee.Name.Local != name {
-		return fmt.Errorf("plist: expected end element %q", name)
-	}
 	return nil
 }
