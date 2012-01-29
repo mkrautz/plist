@@ -3,6 +3,7 @@ package xmlplist
 import (
 	"log"
 	"testing"
+	"time"
 )
 
 // todo(mkrautz): Implement proper tests, not just prints
@@ -92,6 +93,19 @@ func TestEncodeRecursiveStruct(t *testing.T) {
 		},
 	}
 	buf, err := Marshal(re)
+	if err != nil {
+		t.Fatalf("unable to marshal: %v", err)
+	}
+
+	log.Printf("%v", string(buf))
+}
+
+func TestEncodeDate(t *testing.T) {
+	m := map[string]interface{}{
+		"now": time.Now(),
+	}
+
+	buf, err := Marshal(m)
 	if err != nil {
 		t.Fatalf("unable to marshal: %v", err)
 	}

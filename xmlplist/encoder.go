@@ -10,6 +10,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"time"
 )
 
 // Marshal returns the XML plist encoding of v.
@@ -117,7 +118,11 @@ func (e *Encoder) encodeAny(rv reflect.Value) (err error) {
 	case reflect.Map:
 		err = e.encodeMap(rv)
 	case reflect.Struct:
-		err = e.encodeStruct(rv)
+		if _, date := rv.Interface().(time.Time); date {
+			err = e.encodeDate(rv)
+		} else {
+			err = e.encodeStruct(rv)
+		}
 	default:
 		return fmt.Errorf("plist: cannot encode %v", rv.Kind())
 	}
@@ -295,6 +300,19 @@ func (e *Encoder) encodeStruct(rv reflect.Value) error {
 	e.indentLevel--
 
 	err = e.writeString("</dict>\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// encodeDate encodes a time.Timem to XML plist format.
+func (e *Encoder) encodeDate(rv reflect.Value) error {
+	t := rv.Interface().(time.Time)
+	str := t.UTC().Format(time.RFC3339)
+
+	err := e.writeString("<date>" + str + "</date>\n")
 	if err != nil {
 		return err
 	}
