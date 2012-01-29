@@ -52,7 +52,7 @@ func (d *Decoder) Decode(v interface{}) error {
 	}
 
 	// \n
-	err = d.expectNewline()
+	err = d.expectWhitespace()
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (d *Decoder) Decode(v interface{}) error {
 	}
 
 	// \n
-	err = d.expectNewline()
+	err = d.expectWhitespace()
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (d *Decoder) Decode(v interface{}) error {
 	return d.parsePlist(v)
 }
 
-func (d *Decoder) expectNewline() error {
+func (d *Decoder) expectWhitespace() error {
 	t, err := d.xd.Token()
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (d *Decoder) parsePlist(v interface{}) error {
 	}
 
 	// \n
-	err = d.expectNewline()
+	err = d.expectWhitespace()
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 
 	dictMap := map[string]interface{}{}
 	for {
-		err := d.expectNewline()
+		err := d.expectWhitespace()
 		if err != nil {
 			return err
 		}
@@ -242,7 +242,7 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 			return errors.New("plist: expected end element for key")
 		}
 
-		err = d.expectNewline()
+		err = d.expectWhitespace()
 		if err != nil {
 			return err
 		}
@@ -340,7 +340,7 @@ func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 
 	var slice []interface{}
 	for {
-		err := d.expectNewline()
+		err := d.expectWhitespace()
 		if err != nil {
 			return err
 		}
