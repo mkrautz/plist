@@ -23,7 +23,7 @@ func onceUponATime() time.Time {
 var encTests []EncoderTest = []EncoderTest{
 	{
 		"testdata/Int.plist.golden",
-		int64(42),
+		[]int64{42},
 	},
 	{
 		"testdata/Array.plist.golden",
@@ -31,15 +31,15 @@ var encTests []EncoderTest = []EncoderTest{
 	},
 	{
 		"testdata/Data.plist.golden",
-		[]byte{0xff, 0xff, 0xff},
+		[][]byte{[]byte{0xff, 0xff, 0xff}},
 	},
 	{
 		"testdata/Float.plist.golden",
-		float64(3.14159265),
+		[]float64{3.14159265},
 	},
 	{
 		"testdata/String.plist.golden",
-		"hey what < is up />",
+		[]string{"hey what < is up />"},
 	},
 	{
 		"testdata/Struct.plist.golden",
@@ -58,7 +58,7 @@ var encTests []EncoderTest = []EncoderTest{
 	},
 	{
 		"testdata/Date.plist.golden",
-		onceUponATime(),
+		[]time.Time{onceUponATime()},
 	},
 }
 

@@ -115,102 +115,6 @@ func TestUnmarshalRecursiveEntitlementsMap(t *testing.T) {
 	}
 }
 
-func TestUnmarshalBooleanRootElement(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/BoolRoot.plist")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	var b bool
-	err = Unmarshal(buf, &b)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if b != false {
-		t.Fatalf("t should be false")
-	}
-}
-
-func TestUnmarshalStringRootElement(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/StringRoot.plist")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	var str string
-	err = Unmarshal(buf, &str)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if str != "hey what up?" {
-		t.Fatalf("str mismatch")
-	}
-}
-
-func TestUnmarshalRealRootElement(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/RealRoot.plist")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	var pi float64
-	err = Unmarshal(buf, &pi)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if pi != 3.14159265 {
-		t.Fatalf("pi mismatch")
-	}
-}
-
-func TestUnmarshalDataRootElement(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/DataRoot.plist")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	var data []byte
-	err = Unmarshal(buf, &data)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if string(data) != "hey what up" {
-		t.Fatalf("data mismatch")
-	}
-}
-
-func TestUnmarshalIntegerRootElement(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/IntegerRoot.plist")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	var val int64
-	err = Unmarshal(buf, &val)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if val != 424344 {
-		t.Fatalf("integer mismatch")
-	}
-}
-
-func TestUnmarshalArrayRootElement(t *testing.T) {
-	buf, err := ioutil.ReadFile("testdata/ArrayRoot.plist")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	var array []interface{}
-	err = Unmarshal(buf, &array)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	expected := []string{"hey", "what", "up"}
-	if len(expected) != len(array) {
-		t.Fatalf("bad len")
-	}
-	for i, s := range expected {
-		if array[i].(string) != s {
-			t.Fatalf("bad value at idx=%v", i)
-		}
-	}
-}
-
 func TestUnmarshalDate(t *testing.T) {
 	buf, err := ioutil.ReadFile("testdata/Date.plist")
 	if err != nil {
@@ -231,5 +135,80 @@ func TestUnmarshalDate(t *testing.T) {
 	}
 	if !readT.UTC().Equal(expectedT.UTC()) {
 		t.Fatalf("date mismatch")
+	}
+}
+
+func TestUnmarshalEverythingArray(t *testing.T) {
+	buf, err := ioutil.ReadFile("testdata/DecodeEverything.plist")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var a []interface{}
+	err = Unmarshal(buf, &a)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if len(a) != 6 {
+		t.Fatalf("len mismatch")
+	}
+
+	integer, ok := a[0].(int64)
+	if !ok {
+		t.Fatalf("integer type mismatch")
+	}
+	if integer != 42 {
+		t.Fatalf("integer value mismatch")
+	}
+
+	real, ok := a[1].(float64)
+	if !ok {
+		t.Fatalf("real type mismatch")
+	}
+	if real != float64(50.0) {
+		t.Fatalf("real value mismatch")
+	}
+
+	expectedT, err := time.Parse(time.RFC3339, "2012-01-29T13:07:25Z")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	date, ok := a[2].(time.Time)
+	if !ok {
+		t.Fatalf("date type mismatch")
+	}
+	if !date.Equal(expectedT) {
+		t.Fatalf("date value mismatch")
+	}
+
+	data, ok := a[3].([]byte)
+	if !ok {
+		t.Fatalf("bad data type")
+	}
+	if len(data) != 3 {
+		t.Fatalf("bad data len")
+	}
+	if data[0] != 0xff && data[1] != 0xff && data[2] != 0xff {
+		t.Fatalf("bad data value")
+	}
+
+	str, ok := a[4].(string)
+	if !ok {
+		t.Fatalf("bad string type")
+	}
+	if str != "hello" {
+		t.Fatalf("bad string value")
+	}
+
+	dict, ok := a[5].(map[string]interface{})
+	if !ok {
+		t.Fatalf("bad dict type")
+	}
+	str, ok = dict["hey"].(string)
+	if !ok {
+		t.Fatalf("bad dict key type")
+	}
+	if str != "ok" {
+		t.Fatalf("bad dict key value")
 	}
 }

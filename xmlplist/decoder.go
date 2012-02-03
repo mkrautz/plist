@@ -210,18 +210,8 @@ func (d *Decoder) readRootType(v interface{}, se xml.StartElement) error {
 		return d.readDict(v, se)
 	case "array":
 		return d.readArray(v, se)
-	case "true", "false":
-		return d.readBool(v, se)
-	case "date":
-		return d.readDate(v, se)
-	case "data":
-		return d.readData(v, se)
-	case "string":
-		return d.readString(v, se)
-	case "real":
-		return d.readReal(v, se)
-	case "integer":
-		return d.readInteger(v, se)
+	default:
+		return fmt.Errorf("plist: bad root element: must be dict or array")
 	}
 
 	return nil
@@ -463,6 +453,7 @@ func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 			if err != nil {
 				return err
 			}
+			slice = append(slice, f)
 		case "integer":
 			var i int64
 			err =  d.readInteger(&i, se)
@@ -629,19 +620,18 @@ func (d *Decoder) readInteger(v interface{}, se xml.StartElement) error {
 	str := string(buf)
 	rv := reflect.ValueOf(v).Elem()
 	var bits int
-	switch rv.Kind() {
+	k := rv.Kind()
+	switch k {
 	case reflect.Int64:
-	case reflect.Uint64:
 		bits = 64
 	case reflect.Int32:
-	case reflect.Uint32:
 		bits = 32
 	case reflect.Int16:
-	case reflect.Uint16:
 		bits = 16
 	case reflect.Int8:
-	case reflect.Uint8:
 		bits = 8
+	default:
+		return fmt.Errorf("plist: cannot read integer into %v field", k)
 	}
 
 	val, err := strconv.ParseInt(str, 10, bits)

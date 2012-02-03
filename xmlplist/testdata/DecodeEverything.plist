@@ -2,8 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <array>
-	<string>hey</string>
-	<string>what</string>
-	<string>up</string>
+	<integer>42</integer>
+	<real>50.0</real>
+	<date>2012-01-29T13:07:25Z</date>
+	<data>////</data>
+	<string>hello</string>
+	<dict>
+		<key>hey</key>
+		<string>ok</string>
+	</dict>
 </array>
 </plist>

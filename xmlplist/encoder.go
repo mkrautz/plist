@@ -78,10 +78,19 @@ func (e *Encoder) Encode(v interface{}) error {
 		return err
 	}
 
-	rv := reflect.ValueOf(v)	
-	err = e.encodeAny(rv)
-	if err != nil {
-		return err
+	if _, isData := v.([]byte); isData {
+		return errors.New("plist: bad root element: must be dict or map")
+	}
+
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct:
+		err = e.encodeAny(rv)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("plist: bad root element: must be dict or map")
 	}
 
 	err = e.writeString("</plist>\n")
