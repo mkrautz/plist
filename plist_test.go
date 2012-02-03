@@ -7,7 +7,7 @@ import (
 )
 
 func TestXMLDefault(t *testing.T) {
-	buf, err := Marshal(int64(42))
+	buf, err := Marshal([]int64{int64(42)})
 	if err != nil {
 		t.Fatalf("unable to marshal: %v", err)
 	}
