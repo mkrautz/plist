@@ -212,3 +212,24 @@ func TestUnmarshalEverythingArray(t *testing.T) {
 		t.Fatalf("bad dict key value")
 	}
 }
+
+type DecodeEverythingWrong struct {
+	Integer float64 `plist:"integer"`
+	Real int64 `plist:"real"`
+	Date []byte `plist:"date"`
+	Data map[interface{}]string `plist:"data"`
+	Hello string `plist:"hello"`
+
+}
+
+func TestDecodeIntoWrongType(t *testing.T) {
+	buf, err := ioutil.ReadFile("testdata/DecodeEverythingWrong.plist")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var dew DecodeEverythingWrong
+	err = Unmarshal(buf, &dew)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+}

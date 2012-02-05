@@ -339,10 +339,7 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
-	err := mapToValue(dictMap, rv)
-	if err != nil {
-		return err
-	}
+	mapToValue(dictMap, rv)
 
 	return nil
 }
@@ -350,7 +347,7 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 // mapToStruct converts the map-representation of the dictionary in dict
 // into a struct or a map given as val. Recursive structs and maps are
 // supported.
-func mapToValue(dict map[string]interface{}, val reflect.Value) error {
+func mapToValue(dict map[string]interface{}, val reflect.Value) { 
 	if val.Kind() == reflect.Map {
 		val.Set(reflect.ValueOf(dict))
 	} else if val.Kind() == reflect.Struct {
@@ -365,17 +362,18 @@ func mapToValue(dict map[string]interface{}, val reflect.Value) error {
 					if fieldVal.Kind() == reflect.Map || fieldVal.Kind() == reflect.Struct {
 						newDict, ok := dictVal.(map[string]interface{})
 						if !ok {
-							return errors.New("plist: attempt to unmarshal non-map into map or struct")
+							return
 						}
 						mapToValue(newDict, fieldVal)
 					} else {
-						fieldVal.Set(reflect.ValueOf(dictVal))
+						if fieldVal.Type() == reflect.ValueOf(dictVal).Type() {
+							fieldVal.Set(reflect.ValueOf(dictVal))
+						}
 					}
 				}
 			}
 		}
 	}
-	return nil
 }
 
 // readArray reads an XML plist array into v. The se parameter must be
@@ -465,6 +463,10 @@ func (d *Decoder) readArray(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
+	k := rv.Kind()
+	if k != reflect.Slice && k != reflect.Array {
+		return fmt.Errorf("plist: cannot read array into %v field", k)
+	}
 	rv.Set(reflect.ValueOf(slice))
 
 	return nil
@@ -477,6 +479,11 @@ func (d *Decoder) readBool(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
+	k := rv.Kind()
+	if k != reflect.Bool {
+		return fmt.Errorf("plist: cannot read boolean into %v field", k)
+	}
+
 	switch se.Name.Local {
 	case "true":
 		rv.SetBool(true)
@@ -512,6 +519,9 @@ func (d *Decoder) readDate(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
+	if rv.Type().Name() != "Time" && rv.Type().PkgPath() != "time" {
+		return fmt.Errorf("plist: cannot read date into time.Time struct")
+	}
 	rv.Set(reflect.ValueOf(t))
 
 	err = d.readEndElement("date")
@@ -539,6 +549,15 @@ func (d *Decoder) readData(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
+	k := rv.Kind()
+	if k != reflect.Slice && k != reflect.Array {
+		return fmt.Errorf("plist: cannot read data into %v field", k)
+	}
+	k = rv.Type().Elem().Kind()
+	if k != reflect.Uint8 {
+		return fmt.Errorf("plist: cannot read data into slice/array with element type %v", k)
+	}
+
 	rv.Set(reflect.ValueOf(dst))
 
 	err = d.readEndElement("data")
@@ -561,6 +580,10 @@ func (d *Decoder) readString(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
+	k := rv.Kind()
+	if k != reflect.String {
+		return fmt.Errorf("plist: cannot read string into %v field", k)
+	}
 	rv.SetString(string(buf))
 
 	err = d.readEndElement("string")
@@ -585,11 +608,14 @@ func (d *Decoder) readReal(v interface{}, se xml.StartElement) error {
 	str := string(buf)
 	rv := reflect.ValueOf(v).Elem()
 	var bits int
-	switch rv.Kind() {
+	k := rv.Kind()
+	switch k {
 	case reflect.Float32:
 		bits = 32
 	case reflect.Float64:
 		bits = 64
+	default:
+		return fmt.Errorf("plist: cannot read real into %v field", k)
 	}
 
 	f, err := strconv.ParseFloat(str, bits)

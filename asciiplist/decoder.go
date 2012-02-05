@@ -169,10 +169,7 @@ Loop:
 	}
 
 	rv := reflect.ValueOf(v).Elem()
-	err := mapToValue(m, rv)
-	if err != nil {
-		return err
-	}
+	mapToValue(m, rv)
 
 	return nil
 }
@@ -180,7 +177,7 @@ Loop:
 // mapToStruct converts the map-representation of the dictionary in dict
 // into a struct or a map given as val. Recursive structs and maps are
 // supported.
-func mapToValue(dict map[string]interface{}, val reflect.Value) error {
+func mapToValue(dict map[string]interface{}, val reflect.Value) { 
 	if val.Kind() == reflect.Map {
 		val.Set(reflect.ValueOf(dict))
 	} else if val.Kind() == reflect.Struct {
@@ -195,15 +192,16 @@ func mapToValue(dict map[string]interface{}, val reflect.Value) error {
 					if fieldVal.Kind() == reflect.Map || fieldVal.Kind() == reflect.Struct {
 						newDict, ok := dictVal.(map[string]interface{})
 						if !ok {
-							return errors.New("plist: attempt to unmarshal non-map into map or struct")
+							return
 						}
 						mapToValue(newDict, fieldVal)
 					} else {
-						fieldVal.Set(reflect.ValueOf(dictVal))
+						if fieldVal.Type() == reflect.ValueOf(dictVal).Type() {
+							fieldVal.Set(reflect.ValueOf(dictVal))
+						}
 					}
 				}
 			}
 		}
 	}
-	return nil
 }
