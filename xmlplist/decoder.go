@@ -150,6 +150,32 @@ func (d *Decoder) expectCharData() ([]byte, error) {
 	return []byte(cd), nil
 }
 
+// expectCharDataOrEndElement reads the next token of
+// the stream, expecting it to be a CharData token, or an
+// end element matching the name given in the name parameter.
+//
+// If it is neither, or the end element doesn't match the given
+// name, an error is returned.
+func (d *Decoder) expectCharDataOrEndElement(name string) (buf []byte, endelem bool, err error) {
+	t, err := d.xd.Token()
+	if err != nil {
+		return nil, false, err
+	}
+	switch elem := t.(type) {
+	case xml.CharData:
+		return []byte(elem), false, nil
+	case xml.EndElement:
+		if elem.Name.Local != name {
+			return nil, false, fmt.Errorf("plist: expected end element %q", name)
+		}
+		return nil, true, nil
+	default:
+		return nil, false, errors.New("plist: expected chardata or end element")
+	}
+
+	panic("unreachable")
+}
+
 // parsePlist parses the first <plist> StartElement and
 // begins reading the root element of the plist into v.
 func (d *Decoder) parsePlist(v interface{}) error {
@@ -339,20 +365,19 @@ func (d *Decoder) readDict(v interface{}, se xml.StartElement) error {
 	}
 
 	rv := reflect.ValueOf(v).Elem()
-	mapToValue(dictMap, rv)
-
-	return nil
+	return mapToValue(dictMap, rv)
 }
 
 // mapToStruct converts the map-representation of the dictionary in dict
 // into a struct or a map given as val. Recursive structs and maps are
 // supported.
-func mapToValue(dict map[string]interface{}, val reflect.Value) { 
+func mapToValue(dict map[string]interface{}, val reflect.Value) error { 
 	if val.Kind() == reflect.Map {
 		val.Set(reflect.ValueOf(dict))
 	} else if val.Kind() == reflect.Struct {
 		typ := val.Type()
 		nfields := val.NumField()
+nextField:
 		for i := 0; i < nfields; i++ {
 			f := typ.Field(i)
 			name := f.Tag.Get("plist")
@@ -362,9 +387,69 @@ func mapToValue(dict map[string]interface{}, val reflect.Value) {
 					if fieldVal.Kind() == reflect.Map || fieldVal.Kind() == reflect.Struct {
 						newDict, ok := dictVal.(map[string]interface{})
 						if !ok {
-							return
+							panic("plist: internal dict value does not map to map[string]interface{}")
 						}
-						mapToValue(newDict, fieldVal)
+						err := mapToValue(newDict, fieldVal)
+						if err != nil {
+							return err
+						}
+					} else if fieldVal.Kind() == reflect.Slice {
+						switch t := dictVal.(type) {
+						case []interface{}: // array
+							if len(t) == 0 {
+								fieldVal.Set(reflect.Zero(fieldVal.Type()))
+							} else {
+								targetTyp := fieldVal.Type().Elem()
+								actualTyp := reflect.TypeOf(t[0])
+
+								ok := false
+								// []interface{} fast path.
+								if targetTyp.Kind() == reflect.Interface {
+									fieldVal.Set(reflect.ValueOf(t))
+									continue nextField
+								// int32/int64 ambiguitiy.
+								} else if targetTyp.Kind() == reflect.Int {
+									switch actualTyp.Kind() {
+									case reflect.Int64, reflect.Int32:
+										ok = true
+									}
+								// uint32/uint64 ambiguity.
+								} else if targetTyp.Kind() == reflect.Uint {
+									switch actualTyp.Kind() {
+									case reflect.Uint64, reflect.Uint32:
+										ok = true
+									}
+								} else if targetTyp.Kind() == actualTyp.Kind() {
+									ok = true
+								}
+								if !ok {
+									return fmt.Errorf("plist: expected target type %v, got %v", targetTyp, actualTyp)
+								}
+
+								sv := reflect.MakeSlice(reflect.SliceOf(targetTyp), 0, len(t))
+								if targetTyp.Kind() == reflect.Int || targetTyp.Kind() == reflect.Uint {
+									for i := 0; i < len(t); i++ {
+										switch v := t[i].(type) {
+										case int32:
+											sv = reflect.Append(sv, reflect.ValueOf(int(v)))
+										case int64:
+											sv = reflect.Append(sv, reflect.ValueOf(int(v)))
+										case uint32:
+											sv = reflect.Append(sv, reflect.ValueOf(uint(v)))
+										case uint64:
+											sv = reflect.Append(sv, reflect.ValueOf(uint(v)))
+										}
+									}
+								} else {
+									for i := 0; i < len(t); i++ {
+										reflect.Append(sv, reflect.ValueOf(t[i]))
+									}
+								}
+								fieldVal.Set(sv)
+							}
+						case []byte: // data
+							fieldVal.Set(reflect.ValueOf(t))
+						}
 					} else {
 						if fieldVal.Type() == reflect.ValueOf(dictVal).Type() {
 							fieldVal.Set(reflect.ValueOf(dictVal))
@@ -374,6 +459,8 @@ func mapToValue(dict map[string]interface{}, val reflect.Value) {
 			}
 		}
 	}
+
+	return nil
 }
 
 // readArray reads an XML plist array into v. The se parameter must be
@@ -538,9 +625,12 @@ func (d *Decoder) readData(v interface{}, se xml.StartElement) error {
 		return errors.New("plist: v must be ptr")
 	}
 
-	src, err := d.expectCharData()
+	src, end, err := d.expectCharDataOrEndElement("data")
 	if err != nil {
 		return err
+	}
+	if end {
+		return nil
 	}
 
 	dst, err := base64.StdEncoding.DecodeString(string(src))
@@ -574,7 +664,7 @@ func (d *Decoder) readString(v interface{}, se xml.StartElement) error {
 		return errors.New("plist: v must be ptr")
 	}
 
-	buf, err := d.expectCharData()
+	buf, end, err := d.expectCharDataOrEndElement("string")
 	if err != nil {
 		return err
 	}
@@ -584,7 +674,13 @@ func (d *Decoder) readString(v interface{}, se xml.StartElement) error {
 	if k != reflect.String {
 		return fmt.Errorf("plist: cannot read string into %v field", k)
 	}
-	rv.SetString(string(buf))
+
+	if end {
+		rv.Set(reflect.Zero(rv.Type()))
+		return nil
+	} else {
+		rv.SetString(string(buf))
+	}
 
 	err = d.readEndElement("string")
 	if err != nil {
