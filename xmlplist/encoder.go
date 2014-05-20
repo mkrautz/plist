@@ -125,9 +125,9 @@ func (e *Encoder) encodeAny(v interface{}) (err error) {
 	default:
 		switch v := v.(type) {
 		case int, int8, int16, int32, int64:
-			err = e.encodeInt(v.(int64))
+			err = e.encodeInt(rv.Int())
 		case float32, float64:
-			err = e.encodeFloat(v.(float64))
+			err = e.encodeFloat(rv.Float())
 		case bool:
 			err = e.encodeBoolean(v)
 		case string:
