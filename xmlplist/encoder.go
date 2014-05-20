@@ -24,12 +24,12 @@ func Marshal(v interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// An Encoder encodes Go values into 
+// An Encoder encodes Go values into
 // the XML plist format.
 type Encoder struct {
-	w            io.Writer
-	bw           *bufio.Writer
-	indentLevel  int
+	w           io.Writer
+	bw          *bufio.Writer
+	indentLevel int
 }
 
 // Returns a string that conforms to the current indent level.
@@ -66,14 +66,14 @@ func (e *Encoder) Encode(v interface{}) error {
 	err := e.writeString(xml.Header)
 	if err != nil {
 		return err
-	} 
+	}
 
 	err = e.writeString("<!" + xmlPlistDocType + ">\n")
 	if err != nil {
 		return err
 	}
 
-	err = e.writeString("<plist version=\""+ xmlPlistVersion + "\">\n")
+	err = e.writeString("<plist version=\"" + xmlPlistVersion + "\">\n")
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (e *Encoder) Encode(v interface{}) error {
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Slice, reflect.Array, reflect.Map, reflect.Struct:
-		err = e.encodeAny(rv)
+		err = e.encodeAny(v)
 		if err != nil {
 			return err
 		}
@@ -107,33 +107,36 @@ func (e *Encoder) Encode(v interface{}) error {
 }
 
 // encodeAny encodes any type into its XML plist equivalent.
-func (e *Encoder) encodeAny(rv reflect.Value) (err error) {
+func (e *Encoder) encodeAny(v interface{}) (err error) {
+	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Slice, reflect.Array:
-		_, data := rv.Interface().([]byte)
-		if data {
-			err = e.encodeData(rv)	
+		if v, data := rv.Interface().([]byte); data {
+			err = e.encodeData(v)
 		} else {
 			err = e.encodeArray(rv)
 		}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		err = e.encodeInt(rv)
-	case reflect.Float32, reflect.Float64:
-		err = e.encodeFloat(rv)
-	case reflect.Bool:
-		err = e.encodeBoolean(rv)
-	case reflect.String:
-		err = e.encodeString(rv)
-	case reflect.Map:
-		err = e.encodeMap(rv)
 	case reflect.Struct:
-		if _, date := rv.Interface().(time.Time); date {
-			err = e.encodeDate(rv)
+		if v, date := rv.Interface().(time.Time); date {
+			err = e.encodeDate(v)
 		} else {
 			err = e.encodeStruct(rv)
 		}
 	default:
-		return fmt.Errorf("plist: cannot encode %v", rv.Kind())
+		switch v := v.(type) {
+		case int, int8, int16, int32, int64:
+			err = e.encodeInt(rv.Int())
+		case float32, float64:
+			err = e.encodeFloat(rv.Float())
+		case bool:
+			err = e.encodeBoolean(v)
+		case string:
+			err = e.encodeString(v)
+		case map[string]interface{}:
+			err = e.encodeMap(v)
+		default:
+			return fmt.Errorf("plist: cannot encode %v (type %T)", v, v)
+		}
 	}
 	return err
 }
@@ -148,12 +151,12 @@ func (e *Encoder) encodeArray(rv reflect.Value) error {
 	e.indentLevel++
 
 	for i := 0; i < rv.Len(); i++ {
-		ev := rv.Index(i)
+		ev := rv.Index(i).Interface()
 		err = e.encodeAny(ev)
 		if err != nil {
 			return err
 		}
-	} 
+	}
 
 	e.indentLevel--
 
@@ -166,8 +169,7 @@ func (e *Encoder) encodeArray(rv reflect.Value) error {
 }
 
 // encodeInt encodes an integer type to the XML plist format.
-func (e *Encoder) encodeInt(rv reflect.Value) error {
-	val := rv.Int()
+func (e *Encoder) encodeInt(val int64) error {
 	err := e.writeString("<integer>" + strconv.FormatInt(val, 10) + "</integer>\n")
 	if err != nil {
 		return err
@@ -176,8 +178,7 @@ func (e *Encoder) encodeInt(rv reflect.Value) error {
 }
 
 // encodeFloat encodes a floating point number to the XML plist format.
-func (e *Encoder) encodeFloat(rv reflect.Value) error {
-	val := rv.Float()
+func (e *Encoder) encodeFloat(val float64) error {
 	err := e.writeString("<real>" + strconv.FormatFloat(val, 'f', -1, 64) + "</real>\n")
 	if err != nil {
 		return err
@@ -186,9 +187,7 @@ func (e *Encoder) encodeFloat(rv reflect.Value) error {
 }
 
 // encodeData encodes a byte slice to the XML plist format.
-func (e *Encoder) encodeData(rv reflect.Value) error {
-	buf := rv.Interface().([]byte)
-
+func (e *Encoder) encodeData(buf []byte) error {
 	err := e.writeString("<data>" + base64.StdEncoding.EncodeToString(buf) + "</data>\n")
 	if err != nil {
 		return err
@@ -198,9 +197,9 @@ func (e *Encoder) encodeData(rv reflect.Value) error {
 }
 
 // encodeBoolean encodes a bool to the XML plist format.
-func (e *Encoder) encodeBoolean(rv reflect.Value) error {
+func (e *Encoder) encodeBoolean(v bool) error {
 	str := "<false/>\n"
-	if rv.Bool() {
+	if v {
 		str = "<true/>\n"
 	}
 	err := e.writeString(str)
@@ -211,9 +210,7 @@ func (e *Encoder) encodeBoolean(rv reflect.Value) error {
 }
 
 // encodeString encodes a string to the XML plist format.
-func (e *Encoder) encodeString(rv reflect.Value) error {
-	str := rv.String()
-
+func (e *Encoder) encodeString(str string) error {
 	_, err := e.bw.WriteString(e.indent() + "<string>")
 	if err != nil {
 		return err
@@ -230,12 +227,7 @@ func (e *Encoder) encodeString(rv reflect.Value) error {
 }
 
 // encodeMap encodes a map to an XML plist dict.
-func (e *Encoder) encodeMap(rv reflect.Value) error {
-	dict, ok := rv.Interface().(map[string]interface{})
-	if !ok {
-		return errors.New("plist: bad map kind (must be map[string]interface{}")
-	}
-
+func (e *Encoder) encodeMap(dict map[string]interface{}) error {
 	err := e.writeString("<dict>\n")
 	if err != nil {
 		return err
@@ -254,7 +246,7 @@ func (e *Encoder) encodeMap(rv reflect.Value) error {
 			return err
 		}
 
-		err = e.encodeAny(reflect.ValueOf(v))
+		err = e.encodeAny(v)
 		if err != nil {
 			return err
 		}
@@ -300,7 +292,7 @@ func (e *Encoder) encodeStruct(rv reflect.Value) error {
 			return err
 		}
 
-		err = e.encodeAny(rv.Field(i))
+		err = e.encodeAny(rv.Field(i).Interface())
 		if err != nil {
 			return err
 		}
@@ -317,8 +309,7 @@ func (e *Encoder) encodeStruct(rv reflect.Value) error {
 }
 
 // encodeDate encodes a time.Timem to XML plist format.
-func (e *Encoder) encodeDate(rv reflect.Value) error {
-	t := rv.Interface().(time.Time)
+func (e *Encoder) encodeDate(t time.Time) error {
 	str := t.UTC().Format(time.RFC3339)
 
 	err := e.writeString("<date>" + str + "</date>\n")
